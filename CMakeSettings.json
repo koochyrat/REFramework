@@ -1,0 +1,32 @@
+﻿{
+  "configurations": [
+    {
+      "name": "x64-Debug (default)",
+      "generator": "Ninja",
+      "configurationType": "Release",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "variables": [
+        {
+          "name": "SINGLE_BUILD",
+          "value": "False",
+          "type": "BOOL"
+        },
+        {
+          "name": "DEVELOPER_MODE",
+          "value": "False",
+          "type": "BOOL"
+        },
+        {
+          "name": "RE2",
+          "value": "True",
+          "type": "BOOL"
+        }
+      ]
+    }
+  ]
+}

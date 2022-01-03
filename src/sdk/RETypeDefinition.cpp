@@ -1,6 +1,7 @@
 #include <deque>
 #include <mutex>
 #include <shared_mutex>
+#include <sstream>
 
 #include "REFramework.hpp"
 
