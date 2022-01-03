@@ -905,9 +905,14 @@ void VR::update_camera() {
     static auto via_camera = sdk::RETypeDB::get()->find_type("via.Camera");
     static auto get_near_clip_plane_method = via_camera->get_method("get_NearClipPlane");
     static auto get_far_clip_plane_method = via_camera->get_method("get_FarClipPlane");
+    static auto set_far_clip_plane_method = via_camera->get_method("set_FarClipPlane");
     static auto set_fov_method = via_camera->get_method("set_FOV");
     static auto set_vertical_enable_method = via_camera->get_method("set_VerticalEnable");
     static auto set_aspect_ratio_method = via_camera->get_method("set_AspectRatio");
+
+    if (m_use_custom_view_distance->value()) {
+        set_far_clip_plane_method->call<void*>(sdk::get_thread_context(), camera, m_view_distance->value());
+    }
 
     m_nearz = get_near_clip_plane_method->call<float>(sdk::get_thread_context(), camera);
     m_farz = get_far_clip_plane_method->call<float>(sdk::get_thread_context(), camera);
@@ -1287,7 +1292,9 @@ int32_t VR::get_game_frame_count() const {
         return 0;
     }
 
-    return sdk::call_object_func<int32_t>(renderer, renderer_type, "get_RenderFrame", sdk::get_thread_context(), renderer);
+    static auto get_render_frame_method = renderer_type->get_method("get_RenderFrame");
+
+    return get_render_frame_method->call<int32_t>(sdk::get_thread_context(), renderer);
 }
 
 float VR::get_standing_height() {
@@ -1659,10 +1666,9 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
 
                             gui_matrix = look_mat;
                             gui_matrix[3] = new_pos;
-                            sdk::call_object_func<void*>(game_object->transform, "set_Position", context, game_object->transform, &new_pos);
-                            sdk::call_object_func<void*>(game_object->transform, "set_Rotation", context, game_object->transform, &look_rot);
+                            sdk::set_transform_position(game_object->transform, new_pos);
+                            sdk::set_transform_rotation(game_object->transform, look_rot);
                             
-
                             if (child != nullptr) {
                                 regenny::via::Size gui_size{};
                                 sdk::call_object_func<void*>(view, "get_ScreenSize", &gui_size, context, view);
@@ -1699,7 +1705,8 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
 
                         // ... RE7
                         if (child != nullptr && utility::re_managed_object::get_field<wchar_t*>(child, "Name") == std::wstring_view(L"c_interact")) {
-                            auto world_pos_attach_comp = utility::re_component::find(game_object->transform, "app.UIWorldPosAttach");
+                            static auto ui_world_pos_attach_typedef = sdk::RETypeDB::get()->find_type("app.UIWorldPosAttach");
+                            auto world_pos_attach_comp = utility::re_component::find(game_object->transform, ui_world_pos_attach_typedef->get_type());
 
                             // Fix the world position of the gui element
                             if (world_pos_attach_comp != nullptr) {
@@ -1733,7 +1740,7 @@ void VR::on_gui_draw_element(REComponent* gui_element, void* primitive_context) 
         auto game_object = utility::re_component::get_game_object(data->element);
 
         if (game_object != nullptr && game_object->transform != nullptr) {
-            sdk::call_object_func<Vector3f*>(game_object->transform, "set_Position", context, game_object->transform, &data->original_position);
+            sdk::set_transform_position(game_object->transform, data->original_position);
         }
     }
 
@@ -1873,7 +1880,7 @@ void VR::on_pre_begin_rendering(void* entry) {
         return;
     }
 
-    const auto should_update_camera = (m_frame_count % 2 == m_left_eye_interval) || m_use_afr;
+    const auto should_update_camera = (m_frame_count % 2 == m_left_eye_interval) || is_using_afr();
 
     if (!inside_on_end && should_update_camera) {
         update_camera();
@@ -1907,8 +1914,8 @@ void VR::on_end_rendering(void* entry) {
         return;
     }
 
-    if (m_use_afr || inside_on_end) {
-        if (m_use_afr) {
+    if (is_using_afr() || inside_on_end) {
+        if (is_using_afr()) {
             restore_camera();
             m_in_render = false;
         }
@@ -2464,14 +2471,16 @@ void VR::on_draw_ui() {
     ImGui::DragFloat3("Overlay Rotation", (float*)&m_overlay_rotation, 0.01f, -360.0f, 360.0f);
     ImGui::DragFloat3("Overlay Position", (float*)&m_overlay_position, 0.01f, -100.0f, 100.0f);
 
-    if (ImGui::Checkbox("Use AFR", &m_use_afr)) {
-    }
+    m_use_afr->draw("Use AFR");
 
     if (ImGui::Checkbox("Positional Tracking", &m_positional_tracking)) {
     }
 
     /*if (ImGui::Checkbox("Depth Aided Reprojection", &m_depth_aided_reprojection)) {
     }*/
+
+    m_use_custom_view_distance->draw("Use Custom View Distance");
+    m_view_distance->draw("View Distance/FarZ");
 
     ImGui::DragFloat("UI Scale", &m_ui_scale, 0.005f, 0.0f, 100.0f);
 
